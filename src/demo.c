@@ -15,6 +15,8 @@
 #include <sys/time.h>
 #endif
 
+//#include <iostream>
+
 #define FRAMES 3
 
 #ifdef OPENCV
@@ -48,7 +50,9 @@ static image images[FRAMES];
 static IplImage* ipl_images[FRAMES];
 static float *avg;
 
-void draw_detections_cv(IplImage* show_img, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int classes);
+FILE *f_dat;
+
+void draw_detections_cv(IplImage* show_img, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int classes, FILE *f_dat);
 void show_image_cv_ipl(IplImage *disp, const char *name);
 image get_image_from_stream_resize(CvCapture *cap, int w, int h, IplImage** in_img);
 IplImage* in_img;
@@ -56,6 +60,7 @@ IplImage* det_img;
 IplImage* show_img;
 
 static int flag_exit;
+static int framecx;
 
 void *fetch_in_thread(void *ptr)
 {
@@ -104,9 +109,13 @@ void *detect_in_thread(void *ptr)
 	ipl_images[demo_index] = det_img;
 	det_img = ipl_images[(demo_index + FRAMES / 2 + 1) % FRAMES];
     demo_index = (demo_index + 1)%FRAMES;
+
+    fprintf(f_dat, "frame: %d\n", framecx);
+    framecx++;
 	    
 	//draw_detections(det, l.w*l.h*l.n, demo_thresh, boxes, probs, demo_names, demo_alphabet, demo_classes);
-	draw_detections_cv(det_img, l.w*l.h*l.n, demo_thresh, boxes, probs, demo_names, demo_alphabet, demo_classes);
+	draw_detections_cv(det_img, l.w*l.h*l.n, demo_thresh, boxes, probs, demo_names, demo_alphabet, demo_classes, f_dat);
+    fflush(f_dat);
 
 	return 0;
 }
@@ -139,11 +148,18 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
 
     srand(2222222);
 
+    framecx = 0;
+
+    char buf[256];
     if(filename){
         printf("video file: %s\n", filename);
         cap = cvCaptureFromFile(filename);
+        snprintf(buf, sizeof buf, "%s%s", filename, ".dat");
+        f_dat = fopen(buf, "w");
     }else{
         cap = cvCaptureFromCAM(cam_index);
+        snprintf(buf, sizeof buf, "%s%s", "out", ".dat");
+        f_dat = fopen(buf, "w");
     }
 
     if(!cap) error("Couldn't connect to webcam.\n");
@@ -187,24 +203,29 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
     if(!prefix && !dont_show){
         cvNamedWindow("Demo", CV_WINDOW_NORMAL); 
         cvMoveWindow("Demo", 0, 0);
-        cvResizeWindow("Demo", 1352, 1013);
+        //cvResizeWindow("Demo", 1352, 1013);
+        cvResizeWindow("Demo", 1280, 720);
     }
 
 	CvVideoWriter* output_video_writer = NULL;    // cv::VideoWriter output_video;
+    
+    
 	if (out_filename)
 	{
+        
 		CvSize size;
 		size.width = det_img->width, size.height = det_img->height;
 
 		//const char* output_name = "test_dnn_out.avi";
 		//output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('H', '2', '6', '4'), 25, size, 1);
-		output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('D', 'I', 'V', 'X'), 25, size, 1);
+		output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('D', 'I', 'V', 'X'), 20, size, 1);
 		//output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('M', 'J', 'P', 'G'), 25, size, 1);
 		//output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('M', 'P', '4', 'V'), 25, size, 1);
 		//output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('M', 'P', '4', '2'), 25, size, 1);
 		//output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('X', 'V', 'I', 'D'), 25, size, 1);
 		//output_video_writer = cvCreateVideoWriter(out_filename, CV_FOURCC('W', 'M', 'V', '2'), 25, size, 1);
-	}
+    }
+    
 	flag_exit = 0;
 
     double before = get_wall_time();
@@ -288,10 +309,12 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
         }
     }
 	printf("input video stream closed. \n");
+    //fprintf(f_dat, "This is testing for fprintf...\n");
 	if (output_video_writer) {
 		cvReleaseVideoWriter(&output_video_writer);
 		printf("output_video_writer closed. \n");
 	}
+    fclose(f_dat);
 }
 #else
 void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const char *filename, char **names, int classes, int frame_skip, char *prefix, char *out_filename, int http_stream_port, int dont_show)

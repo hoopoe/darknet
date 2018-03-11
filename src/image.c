@@ -241,7 +241,7 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
 }
 
 #ifdef OPENCV
-void draw_detections_cv(IplImage* show_img, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int classes)
+void draw_detections_cv(IplImage* show_img, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int classes, FILE *f_dat)
 {
 	int i;
 
@@ -258,6 +258,9 @@ void draw_detections_cv(IplImage* show_img, int num, float thresh, box *boxes, f
 			}
 
 			printf("%s: %.0f%%\n", names[class_id], prob * 100);
+
+            
+
 			int offset = class_id * 123457 % classes;
 			float red = get_color(2, offset, classes);
 			float green = get_color(1, offset, classes);
@@ -275,6 +278,8 @@ void draw_detections_cv(IplImage* show_img, int num, float thresh, box *boxes, f
 			int right = (b.x + b.w / 2.)*show_img->width;
 			int top = (b.y - b.h / 2.)*show_img->height;
 			int bot = (b.y + b.h / 2.)*show_img->height;
+
+            fprintf(f_dat, "%s, %.0f%%, %d, %d, %d, %d \n", names[class_id], prob, left, right, top, bot);
 
 			if (left < 0) left = 0;
 			if (right > show_img->width - 1) right = show_img->width - 1;
